@@ -1605,33 +1605,20 @@ def generate_post_text(task_type, template_instructions, description):
 
 # Function to generate an image from text (placeholder; replace with your text-to-image function)
 def generate_post_image(post_text):
-    # Configuration details
-    api_key = GPT_API
-    
-    # Construct the full endpoint URL for image generation
-    url = DALLE_ENDPOINT
-    
-    # Define headers including the API key and content type
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": api_key,
-    }
-    
-    # Prepare the JSON payload using the post_text as the prompt
-    payload = {
-        "model": "dall-e-3",
-        "prompt": post_text,
-        "n": 1
-    }
-    
-    # Make the POST request to the API
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()  # Raise an error if the request failed
-    
-    # Parse the JSON response to extract the image URL
-    data = response.json()
-    image_url = data["data"][0]["url"]
-    
+    from openai import AzureOpenAI
+    client = AzureOpenAI(
+        api_version="2024-02-01",
+        azure_endpoint=DALLE_ENDPOINT,
+        api_key=GPT_API, 
+    )
+
+    result = client.images.generate(
+        model="dall-e-3", # the name of your DALL-E 3 deployment
+        prompt=post_text,
+        n=1
+    )
+
+    image_url = json.loads(result.model_dump_json())['data'][0]['url']
     return image_url
 
 def sanitize_text(message_text):
