@@ -771,6 +771,7 @@ INFERENCE_PROFILE_ARN = SECRETS["INFERENCE_PROFILE_ARN"]
 REGION = SECRETS["REGION"]
 GPT_ENDPOINT = SECRETS["GPT_ENDPOINT"]
 GPT_API = SECRETS["GPT_API"]
+DALLE_ENDPOINT = SECRETS["DALLE_ENDPOINT"]
 TAVILY_API = SECRETS["TAVILY_API"]
 WHATSAPP_TOKEN = SECRETS["WHATSAPP_TOKEN"]
 EMAIL_ID = SECRETS["EMAIL_ID"]
@@ -1604,8 +1605,34 @@ def generate_post_text(task_type, template_instructions, description):
 
 # Function to generate an image from text (placeholder; replace with your text-to-image function)
 def generate_post_image(post_text):
-    # Dummy image URL (replace with your function that returns a path or URL)
-    return "https://via.placeholder.com/400.png?text=Generated+Image"
+    # Configuration details
+    api_key = GPT_API
+    
+    # Construct the full endpoint URL for image generation
+    url = DALLE_ENDPOINT
+    
+    # Define headers including the API key and content type
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": api_key,
+    }
+    
+    # Prepare the JSON payload using the post_text as the prompt
+    payload = {
+        "model": "dall-e-3",
+        "prompt": post_text,
+        "n": 1
+    }
+    
+    # Make the POST request to the API
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()  # Raise an error if the request failed
+    
+    # Parse the JSON response to extract the image URL
+    data = response.json()
+    image_url = data["data"][0]["url"]
+    
+    return image_url
 
 def sanitize_text(message_text):
     # Remove newline and tab characters
