@@ -720,6 +720,7 @@ from docx import Document
 from pptx import Presentation
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
+import io
 
 if "Authenticator" not in st.session_state:
     st.session_state["Authenticator"] = None
@@ -932,6 +933,15 @@ def download_from_blob_storage(s3_bucket_name, s3_key, local_file_path):
     except Exception as e:
         print(f"Failed to download {s3_key}: {str(e)}")
         return False
+
+def create_word_doc(text):
+    doc = Document()
+    doc.add_heading("Chat Answer", level=1)
+    doc.add_paragraph(text)
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
 
 # Function to Generate titan embeddings
 def generate_titan_embeddings(text):
@@ -2274,6 +2284,16 @@ def main():
                         
                         st.write("**WhatsApp Sharing Results:**", whatsapp_results)
                         st.write("**Email Sharing Results:**", email_results)
+                # New expander for downloading the answer as a Word document
+                with st.expander("Download as Word Document"):
+                    word_buffer = create_word_doc(message["content"])
+                    st.download_button(
+                        label="Download Answer",
+                        data=word_buffer,
+                        file_name="Answer.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+
 
         # --- New User Input using text_area ---
         user_message = user_input()
