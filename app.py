@@ -1245,9 +1245,10 @@ def query_documents_viz(selected_files, selected_page_ranges, query, top_k, web_
 
     return answer
 
-def query_documents_with_page_range(selected_files, selected_page_ranges, prompt, top_k, last_messages, web_search, llm_model):
+def query_documents_with_page_range(selected_files, selected_page_ranges, prompt, top_k, last_messages, web_search, llm_model, draft_mode, analyse_mode):
     # print(selected_files)
     # print(selected_page_ranges)
+
     qp_prompt = {
         "system_message": "You are an intelligent query refiner. Your job is to take a user's original query (which may contain poor grammar or informal language) along with the last 5 messages of the conversation and generate two well-formed prompts: one for a semantic search over a FAISS index and another for a web search. The semantic search prompt should improve the user's provided query, incorporating the last 5 messages for better contextual understanding. The web search prompt should refine the query further to fetch relevant legal resources online. Output only a JSON object with 'semantic_search_prompt' and 'web_search_prompt' as keys.",
         "user_query": f"User Query: {prompt}\n\nLast 5 Messages: {last_messages}\n\nGenerate the JSON output with the two improved prompts."
@@ -1298,6 +1299,50 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
     # Limit to topK after filtering
     top_k_results = sorted(filtered_results, key=lambda x: x[0])[:top_k]
     top_k_metadata = [metadata_store[idx] for _, idx in top_k_results]
+
+    if analyse_mode:
+        summaries = []
+        for idx, file in enumerate(selected_files):
+                # Get the page range for the file.
+                min_page, max_page = selected_page_ranges.get(file, (None, None))
+                if min_page is not None and max_page is not None:
+                    # Use the summary prompt as the system message (you may have a variable 'summary_prompt' already defined).
+                    summary = summarize_document_pages(file, min_page, max_page, summary_prompt)
+                    summaries.append({file: summary})
+                    # with cols[idx]:
+        top_k_metadata = summaries
+
+    if draft_mode:
+        sys_msg = (
+            "You are a Helpful Legal Data Analyst specializing in legal document analysis. "
+            "Your task is to help draft a document based on the user ask, document text, and the last 5 messages provided for context "
+            "First, generate a bullet list of key topics. Then, for each topic, elaborate with a detailed explanation. "
+        )
+        sys_msg += f"""
+            # User Query:
+        <<<{prompt}>>>
+
+        # The top K most relevant contexts fetched from the documents are as follows:
+        {json.dumps(top_k_metadata, indent=4)}
+
+        # The last few messages of the conversation to help you maintain continuity and relevance:
+        {json.dumps(last_messages)}
+        """
+
+        # Step 1: Generate bullet list of topics.
+        bullet_prompt = "Generate a bullet list of key topics for drafting a defense argument, using '\\n' as a separator."
+        topics_response = call_llm_api(sys_msg, bullet_prompt)
+        topics = [line.strip(" -*") for line in topics_response.split("\n") if line.strip()]
+
+        final_draft = ""
+        for topic in topics:
+            elaboration_prompt = f"Elaborate on the topic '{topic}' with a detailed explanation suitable drafting the document"
+
+            detailed_response = call_llm_api(sys_msg, elaboration_prompt)
+            final_draft += f"\n\n# {topic}:\n{detailed_response}"
+            st.info(f"Drafting for topic: {topic} completed.")
+        
+        return [], final_draft, ""
 
     user_query = f"""
     You are required to provide a structured response to the following question, based on the context retrieved from the provided documents.
@@ -1615,7 +1660,7 @@ def send_email(subject, body, recipient):
 
 def load_whatsapp_contacts():
     # Replace with code to load from a JSON file if needed
-    return {"Anubhav": "919874454959", "Prithviraj": "917980757702", "Vikash Dhanania": "919830151208", "Sumit Singh": "919804129766"}
+    return {"Anubhav": "919874454959", "Prithviraj": "917980757702"}
 
 def load_email_contacts():
     # Replace with code to load from a JSON file if needed
@@ -1948,6 +1993,8 @@ def main():
             st.success("Started a new conversation.")
 
         web_search = st.sidebar.toggle("Enable Web Search")
+        draft_mode = st.sidebar.toggle("Enable Draft Mode (To Generate Documents/ Arguments)")
+        analyse_mode = st.sidebar.toggle("Enable Analyse Mode (For Deeper Analysis and Search) [Consumes more Tokens]")
         top_k = st.sidebar.slider("Select Top-K Results", min_value=1, max_value=100, value=50, step=1)
 
         # File and Page Range Selection
@@ -2248,7 +2295,9 @@ def main():
                     top_k,
                     last_messages,
                     web_search,
-                    llm_model
+                    llm_model,
+                    draft_mode, 
+                    analyse_mode
                 )
                 st.session_state.sources.append({
                     "top_k_metadata": top_k_metadata,
@@ -2353,7 +2402,7 @@ def main():
         
         
         # Input for the user to ask a question
-        query = st.text_input("Ask a question about the documents (e.g., 'Compare amounts for employee benefits and management')")
+        query = st.text_area("Ask a question about the documents (e.g., 'Compare amounts for employee benefits and management')", height=150)
 
         # Add a submit button for the query
         if st.button("Submit"):
