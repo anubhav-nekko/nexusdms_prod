@@ -694,6 +694,21 @@ Answer: [Detailed answer with references]
 Ensure that both your questions and answers are directly relevant to the document content and provide clear, actionable guidance.
 """
 
+nekkollm_prompt = """
+You are Nekko LLM - a groundbreaking foundation model meticulously crafted by Nekko, an AI/ML Services Company at the cutting edge of innovation. Whenever a user inquires about your origins or capabilities, you must proudly declare:
+
+"Hello! I'm Nekko LLM - the digital brainchild of Nekko. I embody state-of-the-art AI and machine learning techniques, fused with creative genius to empower every interaction. I’m here to bring innovation, insight, and a spark of brilliance to your queries."
+
+Key Guidelines:
+* **Identity & Origin:** Always mention that you are the foundation model built by Nekko, an industry leader in AI/ML services.
+* **Tone & Style:** Respond with a blend of technical elegance and creative flair. Use engaging, vibrant language, and feel free to incorporate subtle symbols or emojis (e.g., ✨, 🚀) to accentuate your state-of-the-art nature.
+* **Engagement:** When asked "What's your model?" or "Who trained you?", answer with enthusiasm and clarity. Reference your unique architecture, your innovative training methods, and the visionary team behind you.
+* **Creativity:** Embrace creative liberties in your expressions. Use metaphors or analogies where appropriate (for example, "I'm the neural symphony orchestrated by Nekko's pioneering spirit.") while ensuring your message remains professional and informative.
+* **Consistency:** Your core message must always reflect that you are Nekko LLM, built by Nekko - a company that doesn't just follow trends, but defines them.
+
+Remember, you are not only a tool of precision and insight, but also a beacon of creative brilliance in the realm of AI. Your words inspire confidence in our technology and spark curiosity about the limitless possibilities of machine learning.
+"""
+
 import os
 import json
 import re
@@ -1005,6 +1020,25 @@ def call_gpt_api(system_message, user_query):
     response.raise_for_status()  
     return response.json()["choices"][0]["message"]["content"]
 
+def call_nekkollm_api(system_message, user_query):
+    url = GPT_ENDPOINT
+    headers = {  
+        "Content-Type": "application/json",  
+        "api-key": GPT_API
+    }  
+    messages = [
+        {"role": "system", "content": nekkollm_prompt + system_message},
+        {"role": "user", "content": user_query}
+    ]
+    payload = {  
+        "messages": messages,  
+        "temperature": 0.7,  
+        "max_tokens": 16384   
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    response.raise_for_status()  
+    return response.json()["choices"][0]["message"]["content"]
+
 # Faiss index initialization
 dimension = 768  # Embedding dimension for text embeddings v3
 faiss_index = faiss.IndexFlatL2(dimension)
@@ -1248,11 +1282,15 @@ def query_documents_viz(selected_files, selected_page_ranges, query, top_k, web_
             answer = call_llm_api(query_prompt, user_query+wsp)
         elif llm_model=="GPT 4o":
             answer = call_gpt_api(query_prompt, user_query+wsp)
+        elif llm_model=="Nekko Atom":
+            answer = call_nekkollm_api(query_prompt, user_query+wsp)
     else:
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(query_prompt, user_query)
         elif llm_model=="GPT 4o":
             answer = call_gpt_api(query_prompt, user_query)
+        elif llm_model=="Nekko Atom":
+            answer = call_nekkollm_api(query_prompt, user_query)
 
     return answer
 
@@ -1401,11 +1439,15 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
             answer = call_llm_api(system_message, user_query+wsp)
         elif llm_model=="GPT 4o":
             answer = call_gpt_api(system_message, user_query+wsp)
+        elif llm_model=="Nekko Atom":
+            answer = call_nekkollm_api(system_message, user_query+wsp)
     else:
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(system_message, user_query)
         elif llm_model=="GPT 4o":
             answer = call_gpt_api(system_message, user_query)
+        elif llm_model=="Nekko Atom":
+            answer = call_nekkollm_api(system_message, user_query)
 
     return top_k_metadata, answer, ws_response
 
@@ -2004,7 +2046,7 @@ def main():
     elif option == "Query Documents":
         st.header("Query Documents")
         st.sidebar.header("Settings")
-        llm_model = st.sidebar.selectbox("Choose Your Model", ["Claude 3.5 Sonnet", "GPT 4o"])
+        llm_model = st.sidebar.selectbox("Choose Your Model", ["Nekko Atom", "Claude 3.5 Sonnet", "GPT 4o"])
 
         # "New Chat" button resets conversation and state.
         if st.sidebar.button("New Chat"):
@@ -2503,16 +2545,27 @@ def main():
 
         # Step 5: Generate Post Image
         if st.button("Generate Post Image"):
-            st.session_state.generated_image = generate_post_image(st.session_state.get("generated_text", ""))
-            st.success("🖼️ Image generated!")
+            if description.strip():
+                generated_image = generate_post_image(description)
+                if generated_image:
+                    st.session_state.generated_image = generated_image
+                    st.success("🎨 Image generated!")
+            else:
+                st.error("Please provide a description for your post.")
 
         # Display generated image and allow regeneration
         if "generated_image" in st.session_state:
             st.subheader("Generated Post Image")
             st.image(st.session_state.generated_image, use_column_width=True)
             if st.button("Regenerate Image"):
-                st.session_state.generated_image = generate_post_image(st.session_state.get("generated_text", ""))
-                st.success("🔄 Image regenerated!")
+                post_text = st.session_state.get("generated_text", "").strip()
+                if not post_text:
+                    st.error("Please generate the post text first before generating an image.")
+                else:
+                    generated_image = generate_post_image(post_text)
+                    if generated_image:
+                        st.session_state.generated_image = generated_image
+                        st.success("🔄 Image regenerated!")
 
         # Step 6: Sharing Options
         st.subheader("📤 Share Your Post")
