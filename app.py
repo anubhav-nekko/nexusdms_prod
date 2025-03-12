@@ -808,8 +808,8 @@ users_file = "../users.json"
 
 # Define a helper function to display your company logo
 def display_logo():
-    # Make sure 'company_logo.png' is in your working directory
-    st.image("gst.png", width=200)
+    # Make sure 'logo.png' is in your working directory
+    st.image("logo.png", width=200)
 
 # Create a Bedrock Runtime client
 bedrock_runtime = boto3.client('bedrock-runtime', region_name=REGION,
@@ -1280,16 +1280,16 @@ def query_documents_viz(selected_files, selected_page_ranges, query, top_k, web_
         """
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(query_prompt, user_query+wsp)
-        elif llm_model=="Model 2":
+        elif llm_model=="GPT 4o":
             answer = call_gpt_api(query_prompt, user_query+wsp)
-        elif llm_model=="Nekko 2":
+        elif llm_model=="Nekko Atom":
             answer = call_nekkollm_api(query_prompt, user_query+wsp)
     else:
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(query_prompt, user_query)
-        elif llm_model=="Model 2":
+        elif llm_model=="GPT 4o":
             answer = call_gpt_api(query_prompt, user_query)
-        elif llm_model=="Nekko 2":
+        elif llm_model=="Nekko Atom":
             answer = call_nekkollm_api(query_prompt, user_query)
 
     return answer
@@ -1365,7 +1365,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
         # Construct a structured system message with clear sections.
         sys_msg = (
             "You are a Helpful Legal Data Analyst specializing in legal document analysis.\n"
-            "Your task is to draft a legal document based on the following inputs. Follow these steps:\n"
+            "Your task is to draft a legal document/ text/ article based on the following inputs. Follow these steps:\n"
             "1. Review the User Query, Document Context, and Conversation History.\n"
             "2. Generate a bullet list of key topics for the document.\n"
             "3. For each topic, draft a detailed section ensuring continuity and avoiding repetition.\n\n"
@@ -1452,16 +1452,16 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
         """
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(system_message, user_query+wsp)
-        elif llm_model=="Model 2":
+        elif llm_model=="GPT 4o":
             answer = call_gpt_api(system_message, user_query+wsp)
-        elif llm_model=="Nekko 2":
+        elif llm_model=="Nekko Atom":
             answer = call_nekkollm_api(system_message, user_query+wsp)
     else:
         if llm_model=="Claude 3.5 Sonnet":
             answer = call_llm_api(system_message, user_query)
-        elif llm_model=="Model 2":
+        elif llm_model=="GPT 4o":
             answer = call_gpt_api(system_message, user_query)
-        elif llm_model=="Nekko 2":
+        elif llm_model=="Nekko Atom":
             answer = call_nekkollm_api(system_message, user_query)
 
     return top_k_metadata, answer, ws_response
@@ -1635,31 +1635,13 @@ def get_web_recommendations(document_summaries, insights):
     
     return web_response, nexus_insights, faq
 
-# # Load WhatsApp (mobile) contacts from JSON file
-# def load_whatsapp_contacts():
-#     try:
-#         with open("mobile_contacts.json", "r") as f:
-#             contacts = json.load(f)
-#         return contacts  # Expected format: {"Alice": "+1234567890", "Bob": "+1987654321"}
-#     except Exception as e:
-#         st.error(f"Error loading mobile contacts: {e}")
-#         return {}
-
-# # Load email contacts from JSON file
-# def load_email_contacts():
-#     try:
-#         with open("email_contacts.json", "r") as f:
-#             contacts = json.load(f)
-#         return contacts  # Expected format: {"Charlie": "charlie@example.com", "Dana": "dana@example.com"}
-#     except Exception as e:
-#         st.error(f"Error loading email contacts: {e}")
-#         return {}
-
 # Function to generate post text (placeholder; replace with your actual API call)
 def generate_post_text(task_type, template_instructions, description):
     prompt = f"Task Type: {task_type}\nTemplate: {template_instructions}\nDescription: {description}\nGenerate a creative post:"
+    user_instructions = "Use your own Creative Liberties. Follow the instructions above and DO not Insert Text on the Images. Include Emojis and Stickers if Appropriate"
+
     # Dummy response for now:
-    return f"Generated post text based on: {description}"
+    return call_llm_api(prompt, user_instructions)
 
 # Function to generate an image from text (placeholder; replace with your text-to-image function)
 def generate_post_image(post_text):
@@ -1711,10 +1693,6 @@ def send_whatsapp_message(recipient, message_text):
     response = requests.post(url, headers=headers, json=data)
     return response.json()
 
-# # Example usage
-# response = send_whatsapp_message("919123987556", "Avi")
-# print(response)
-
 # Email sending function from email.py (adjust if needed)
 def send_email(subject, body, recipient):
     try:
@@ -1750,11 +1728,6 @@ def load_email_contacts():
 
 # Function to handle user input with text_area and predefined prompts
 def user_input():
-    # Dropdown for predefined prompts (add an empty option for no auto-fill)
-    # Optionally, if last_mapping exists, display it automatically:
-    # if st.session_state.sources:
-    #     with st.expander("Show Copyable Answer"):
-    #         st.code(st.session_state.sources[-1]["answer"])
 
     prompt_options = list(prompt_library.keys())
     selected_prompt = st.selectbox("Select a predefined prompt:", prompt_options, index=0)
@@ -2062,7 +2035,7 @@ def main():
     elif option == "Query Documents":
         st.header("Query Documents")
         st.sidebar.header("Settings")
-        llm_model = st.sidebar.selectbox("Choose Your Model", ["Nekko 2", "Claude 3.5 Sonnet", "Model 2"])
+        llm_model = st.sidebar.selectbox("Choose Your Model", ["Nekko Atom", "Claude 3.5 Sonnet", "GPT 4o"])
 
         # "New Chat" button resets conversation and state.
         if st.sidebar.button("New Chat"):
@@ -2173,58 +2146,6 @@ def main():
                 unique_conversations.append(conv)
         unique_conversations.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
 
-        # if st.sidebar.toggle("Rename Conversation"):
-        #     for idx, conv in enumerate(unique_conversations):
-        #         # Use the custom label if available, otherwise use a preview of the first message.
-        #         default_label = conv.get("label", conv.get('messages', [{}])[0].get("content", "")[:20])
-                
-        #         # Create two columns: one for selecting the conversation, one for renaming it.
-        #         col1, col2 = st.sidebar.columns([2, 1])
-                
-        #         # Column 1: Conversation selection button.
-        #         button_key = f"conv_{idx}_{conv.get('label', '')}"
-        #         if col1.button(default_label, key=f"conv_{idx}"):
-        #             st.session_state.current_conversation = conv
-        #             st.session_state.messages = conv.get('messages', [])
-        #             # Restore file and page range selections to session state.
-        #             st.session_state.selected_files = conv.get('files', [])
-        #             st.session_state.selected_page_ranges = conv.get('page_ranges', {})
-        #             # Display the restored selections.
-        #             st.multiselect("Selected Files", options=available_files, default=st.session_state.selected_files)
-        #             for file, (start, end) in st.session_state.selected_page_ranges.items():
-        #                 st.number_input(f"Start page for {file}", value=start, key=f"restore_start_{file}")
-        #                 st.number_input(f"End page for {file}", value=end, key=f"restore_end_{file}")
-                
-        #         # Column 2: Renaming interface.
-        #         new_label = col2.text_input("Rename", value=default_label, key=f"rename_{idx}")
-        #         if col2.button("Save Name", key=f"save_{idx}"):
-        #             # Update the conversation object with the new label.
-        #             conv["label"] = new_label
-        #             user = st.session_state.username
-        #             # Find and update the corresponding conversation in the user's chat history.
-        #             for stored_conv in st.session_state.chat_history.get(user, []):
-        #                 if stored_conv.get("timestamp") == conv.get("timestamp"):
-        #                     stored_conv["label"] = new_label
-        #                     break
-        #             save_chat_history(st.session_state.chat_history)
-        #             st.sidebar.success("Conversation renamed!")
-        # else:
-        #         for idx, conv in enumerate(unique_conversations):
-        #             conv_label = conv.get('messages', [])[0]["content"][:20]
-        #             if 'timestamp' in conv:
-        #                 conv_label += f" ({conv['timestamp']})"
-        #             if st.sidebar.button(conv_label, key=f"conv_{idx}"):
-        #                 st.session_state.current_conversation = conv
-        #                 st.session_state.messages = conv.get('messages', [])
-        #                 # Restore file and page range selections to session state.
-        #                 st.session_state.selected_files = conv.get('files', [])
-        #                 st.session_state.selected_page_ranges = conv.get('page_ranges', {})
-        #                 # Also display the restored selections.
-        #                 st.multiselect("Selected Files", options=available_files, default=st.session_state.selected_files)
-        #                 for file, (start, end) in st.session_state.selected_page_ranges.items():
-        #                     st.number_input(f"Start page for {file}", value=start, key=f"restore_start_{file}")
-        #                     st.number_input(f"End page for {file}", value=end, key=f"restore_end_{file}")
-
         if st.sidebar.toggle("Rename Conversation"):
             for idx, conv in enumerate(unique_conversations):
                 # Use the custom label if available; otherwise, use a preview of the first message.
@@ -2270,47 +2191,54 @@ def main():
                     # Force a full rerun so updated labels and keys are used.
                     st.experimental_rerun()
         else:
+
             for idx, conv in enumerate(unique_conversations):
-                # Use the stored label if available; otherwise, use a preview from the first message.
+                # The first line of the conversation becomes the label if no 'label' set
                 conv_label = conv.get("label") or conv.get('messages', [{}])[0].get("content", "")[:20]
-                if 'timestamp' in conv:
-                    conv_label += f" ({conv['timestamp']})"
-                if st.sidebar.button(conv_label, key=f"conv_{idx}"):
+                
+                # Use two columns in the sidebar
+                col1, col2 = st.sidebar.columns([0.7, 0.3], gap="small")
+
+                # "Load" button in the first column
+                if col1.button(conv_label, key=f"conv_load_{idx}"):
                     st.session_state.current_conversation = conv
                     st.session_state.messages = conv.get('messages', [])
-                    # Completely override previous file selections with those from the conversation.
                     st.session_state.selected_files = conv.get('files', [])
                     st.session_state.selected_page_ranges = conv.get('page_ranges', {})
-                    # Use a new key to reinitialize the multiselect with the conversation's file selections.
-                    new_key = f"selected_files_{conv.get('timestamp', idx)}"
-                    st.session_state.selected_files = st.multiselect(
-                        "Select files to include in the query:",
-                        options=available_files,
-                        default=st.session_state.selected_files,
-                        key=new_key
-                    )
-                    for file, (start, end) in st.session_state.selected_page_ranges.items():
-                        st.number_input(f"Start page for {file}", value=start, key=f"restore_start_{file}")
-                        st.number_input(f"End page for {file}", value=end, key=f"restore_end_{file}")
+                    # If you want to reorder the chat list each time it's clicked, do it here:
+                    user = st.session_state.username
+                    if user in st.session_state.chat_history:
+                        # Update last-used timestamp on the conversation itself (see step 2 below)
+                        conv["timestamp"] = datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S")
+                        # Sort by new timestamp so it goes to the top
+                        st.session_state.chat_history[user] = sorted(
+                            st.session_state.chat_history[user],
+                            key=lambda x: x.get("timestamp", ""),
+                            reverse=True
+                        )
+                        save_chat_history(st.session_state.chat_history)
+                    st.rerun()
 
-
-        # # Display current conversation messages.
-        # for message in st.session_state.messages:
-        #     with st.chat_message(message["role"]):
-        #         st.markdown(message["content"])
-        #         with st.expander("Show Copyable Text"):
-        #             # st.code provides a copy button by default
-        #             st.code(message["content"], language="text")
+                # "Delete" button in the second column
+                if col2.button("X", key=f"conv_delete_{idx}"):
+                    user = st.session_state.username
+                    if user in st.session_state.chat_history:
+                        st.session_state.chat_history[user].remove(conv)
+                        save_chat_history(st.session_state.chat_history)
+                        st.rerun()
 
         # --- Ensure required session state keys exist ---
         if "share_message" not in st.session_state:
             st.session_state.share_message = ""
 
         # --- Display chat messages with share options ---
-        # --- Display chat messages with share options ---
         for idx, message in enumerate(st.session_state.messages):
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+                # Show role and time if available
+                msg_time = message.get("time", "")
+                role_title = message["role"].title()  # "User" / "Assistant"
+                st.markdown(f"**`[{role_title} @ {msg_time}]`**\n\n{message['content']}")
+
                 with st.expander("Show Copyable Text"):
                     st.code(message["content"], language="text")
                 with st.expander("Share Message"):
@@ -2368,14 +2296,44 @@ def main():
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         key=f"download_button_{idx}"  # Unique key per download button
                     )
+    
+                if message["role"] == "assistant":
+                    with st.expander("Sources (click to view)"):
+                        sources = message.get("sources", [])
+                        if not sources:
+                            st.write("No sources for this response.")
+                        else:
+                            top_k_metadata = sources[0]
+                            ws_query = sources[1]
 
+                            # Display file sources separately
+                            for metadata in top_k_metadata:
+                                st.markdown(f"**Filename:** {metadata['filename']}, **Page:** {metadata['page']}")
+                                st.code(metadata['text'], language="markdown")  # Use st.code for better formatting
 
+                            # Show Web Search Results separately
+                            if ws_query:
+                                st.markdown("Web Search Results")
+                                st.code(ws_query)
+
+                            # Button for Source Mapping
+                            if st.button("Show Source Mapping", key=f"source_mapping_{int(time.time() * 1000)}"):
+                                answer = message["content"]
+                                with st.spinner("Mapping Source..."):
+                                    final_answer = final_format(top_k_metadata, answer, ws_query)
+                                    st.write(final_answer)
 
         # --- New User Input using text_area ---
         user_message = user_input()
         if user_message:
             # Append user message and then process query.
-            st.session_state.messages.append({"role": "user", "content": user_message})
+            ist_timezone = pytz.timezone("Asia/Kolkata")
+            timestamp_now = datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state.messages.append({
+                "role": "user",
+                "content": user_message,
+                "time": timestamp_now
+            })
             # Display the user message.
             with st.chat_message("user"):
                 st.markdown(user_message)
@@ -2401,59 +2359,52 @@ def main():
                     "websearch_metadata": ws_response
                 })
 
+                ist_timezone = pytz.timezone("Asia/Kolkata")
+                current_time = datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S")
+
                 # Append assistant response.
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer,
+                    "time": current_time,
+                    "sources": [top_k_metadata, ws_response]
+                })
 
                 with st.chat_message("assistant"):
                     st.markdown(answer)
-                # with st.expander("Show Copyable Answer"):
-                #     st.code(answer, language="text")
 
-                ist_timezone = pytz.timezone('Asia/Kolkata')
+                ist_timezone = pytz.timezone("Asia/Kolkata")
+                current_time = datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S")
+
                 new_conversation = {
-                    "timestamp": datetime.now(ist_timezone).strftime("%Y-%m-%d %H:%M:%S"),
+                    "timestamp": current_time,
                     "messages": st.session_state.messages,
                     "files": st.session_state.selected_files,
                     "page_ranges": st.session_state.selected_page_ranges
                 }
+
                 user = st.session_state.username
-                if user in st.session_state.chat_history:
-                    st.session_state.chat_history[user].append(new_conversation)
-                else:
-                    st.session_state.chat_history[user] = [new_conversation]
-                # Limit to last 20 conversations.
-                # if len(st.session_state.chat_history[user]) > 20:
-                #     st.session_state.chat_history[user] = st.session_state.chat_history[user][-20:]
+                if user not in st.session_state.chat_history:
+                    st.session_state.chat_history[user] = []
+
+                # If this conversation is brand new, just append
+                # If you want to handle "merging" with existing, do it here.
+                st.session_state.chat_history[user].append(new_conversation)
+
+                # Sort so the newest conversation is on top
+                st.session_state.chat_history[user] = sorted(
+                    st.session_state.chat_history[user],
+                    key=lambda x: x.get("timestamp", ""),
+                    reverse=True
+                )
+
                 save_chat_history(st.session_state.chat_history)
                 st.rerun()
-
-        if st.button("Show Source Mapping"):
-            if st.session_state.sources:
-                top_k_metadata = st.session_state.sources[-1]["top_k_metadata"]
-                answer = st.session_state.sources[-1]["answer"]
-                ws_query = st.session_state.sources[-1]["websearch_metadata"]
-                with st.spinner("Mapping Source..."):
-                    final_answer = final_format(top_k_metadata, answer, ws_query)
-                    st.write(final_answer)
-                    st.subheader("Relevant Pages and Web Pages:")
-                    for metadata in top_k_metadata:
-                        with st.expander(f"Filename: {metadata['filename']}, Page: {metadata['page']}"):
-                            st.write(f"```{metadata['text']}```")
-                    with st.expander("Web Search Results"):
-                        st.json(ws_query)
-            else:
-                st.warning("No recent query to map sources for.")
-        
-        # # Optionally, if last_mapping exists, display it automatically:
-        # if st.session_state.sources:
-        #     with st.expander("Show Copyable Answer"):
-        #         st.code(st.session_state.sources[-1]["answer"])
-
 
     elif option == "Query Advanced":
         st.header("Query Advanced")
         st.sidebar.header("Settings")
-        llm_model = st.sidebar.selectbox("Choose Your Model", ["Nekko 2", "Claude 3.5 Sonnet", "Model 2"])
+        llm_model = st.sidebar.selectbox("Choose Your Model", ["Nekko Atom", "Claude 3.5 Sonnet", "GPT 4o"])
 
         web_search = st.sidebar.toggle("Enable Web Search")
         top_k = st.sidebar.slider("Select Top-K Results", min_value=1, max_value=100, value=50, step=1)
@@ -2505,7 +2456,6 @@ def main():
             # Process the query and display the results
             if query:
                 result = query_documents_viz(st.session_state.selected_files, selected_page_ranges, query, top_k, web_search, llm_model)
-                # st.session_state.query_history.append(query)  # Append query to the session history
 
                 # Display results or generated Python code
                 if "```python" in result:
