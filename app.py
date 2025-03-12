@@ -736,6 +736,13 @@ from pptx import Presentation
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
 import io
+from io import BytesIO
+from PIL import Image
+import cv2
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from openai import AzureOpenAI
 
 if "Authenticator" not in st.session_state:
     st.session_state["Authenticator"] = None
@@ -1645,7 +1652,6 @@ def generate_post_text(task_type, template_instructions, description):
 
 # Function to generate an image from text (placeholder; replace with your text-to-image function)
 def generate_post_image(post_text):
-    from openai import AzureOpenAI
     client = AzureOpenAI(
         api_version="2024-02-01",
         azure_endpoint=DALLE_ENDPOINT,
@@ -1696,10 +1702,6 @@ def send_whatsapp_message(recipient, message_text):
 # Email sending function from email.py (adjust if needed)
 def send_email(subject, body, recipient):
     try:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-
         EMAIL_ADDRESS = EMAIL_ID  # Replace with your sender email
         EMAIL_PASSWORD = EMAIL_PWD  # Replace with your app password
 
@@ -1971,6 +1973,73 @@ def add_file_to_index(uploaded_file):
         process_spreadsheet(uploaded_file)
     else:
         st.error(f"Unsupported file type: {ext}")
+
+# --- Helper Function: Overlay Logo and Dynamic Text ---
+def load_image_from_input(image_input):
+    """
+    Loads an image from a local file path or a URL.
+    """
+    if isinstance(image_input, str) and image_input.startswith("http"):
+        try:
+            response = requests.get(image_input)
+            response.raise_for_status()  # Ensure we got a valid response
+            return Image.open(BytesIO(response.content))
+        except requests.RequestException as e:
+            st.error(f"Error loading image from URL: {e}")
+            return None
+    else:
+        return Image.open(image_input)
+
+def overlay_logo_and_text(image_input, logo_path, bottom_text, overlay_text, overlay_x_pct, overlay_y_pct, text_mode, font_adjuster):
+    # Load main image from URL or local file
+    main_image = load_image_from_input(image_input)
+    if main_image is None:
+        return None  # Stop processing if image load failed
+
+    # Load logo (assuming logo is a local file)
+    logo = Image.open(logo_path)
+
+    # Get image dimensions
+    img_width, img_height = main_image.size
+
+    # Resize logo relative to image size (10% of image width)
+    logo_width = int(img_width * 0.1)
+    logo_height = int(logo.size[1] * (logo_width / logo.size[0]))  # Maintain aspect ratio
+    logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+
+    # Paste the logo at top-left with 5% padding
+    logo_x = int(img_width * 0.05)
+    logo_y = int(img_height * 0.05)
+    main_image.paste(logo, (logo_x, logo_y), logo)
+
+    # Convert image to OpenCV format for text overlay
+    image_cv = np.array(main_image)
+    image_cv = cv2.cvtColor(image_cv, cv2.COLOR_RGB2BGR)
+
+    # Define font settings (scaling font and thickness with image width)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = max(1, img_width // 500) * font_adjuster
+    thickness = max(2, img_width // 400)
+
+    # Set text color based on user selection
+    if text_mode.lower() == "light":
+        font_color = (255, 255, 255)  # White text for light backgrounds
+    else:
+        font_color = (0, 0, 0)        # Black text for dark backgrounds
+
+    # Add bottom text at 5% padding from left and 5% above the bottom edge
+    bottom_x = int(img_width * 0.05)
+    bottom_y = img_height - int(img_height * 0.05)
+    cv2.putText(image_cv, bottom_text, (bottom_x, bottom_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
+
+    # Calculate overlay text position using percentage values (0 to 100)
+    overlay_x = int(img_width * overlay_x_pct / 100)
+    overlay_y = int(img_height * overlay_y_pct / 100)
+    cv2.putText(image_cv, overlay_text, (overlay_x, overlay_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
+
+    # Convert back to PIL format
+    final_image = Image.fromarray(cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB))
+    return final_image
 
 def main():
     # Try to restore authentication from session state or cookie.
@@ -2512,7 +2581,7 @@ def main():
         # Step 5: Generate Post Image
         if st.button("Generate Post Image"):
             if description.strip():
-                generated_image = generate_post_image(description)
+                generated_image = generate_post_image(description)  # This may return a URL string.
                 if generated_image:
                     st.session_state.generated_image = generated_image
                     st.success("🎨 Image generated!")
@@ -2533,7 +2602,38 @@ def main():
                         st.session_state.generated_image = generated_image
                         st.success("🔄 Image regenerated!")
 
-        # Step 6: Sharing Options
+            # --- Step 6: Customize the Image with Overlays ---
+            st.subheader("Customize Your Image")
+            bottom_text = st.text_input("Enter text for the bottom of the image:", "Contact us at info@example.com")
+            overlay_text = st.text_input("Enter additional text on the image:", "Special Offer!")
+
+            text_mode = st.selectbox("Select overlay text color mode:", options=["Light", "Dark"], index=0)
+            font_adjuster = st.slider("Adjust overlay font size", 0.5, 3.0, 1.0, step=0.1)
+
+            # Text position sliders (values in percentages relative to image dimensions)
+            overlay_x_pct = st.slider("Overlay Text X Position (%)", 0, 100, 50)
+            overlay_y_pct = st.slider("Overlay Text Y Position (%)", 0, 100, 50)
+
+            # Apply overlays (using the generated image and logo.png)
+            processed_image = overlay_logo_and_text(
+                st.session_state.generated_image,
+                "logo.png", 
+                bottom_text, 
+                overlay_text, 
+                overlay_x_pct, 
+                overlay_y_pct,
+                text_mode,
+                font_adjuster
+            )
+            if processed_image:
+                st.image(processed_image, caption="Modified Image with Overlays", use_column_width=True)
+
+                # Provide download option for the processed image
+                processed_image.save("output_image.jpg")
+                with open("output_image.jpg", "rb") as file:
+                    st.download_button(label="Download Image", data=file, file_name="modified_image.jpg", mime="image/jpeg")
+
+        # --- Step 7: Sharing Options ---
         st.subheader("📤 Share Your Post")
 
         # WhatsApp Sharing Section
@@ -2556,7 +2656,7 @@ def main():
         )
         new_email_addresses = st.text_input("Or add new Email addresses (comma-separated):", key="email_new")
 
-        # Step 7: Share Button
+        # Step 8: Share Button
         if st.button("🚀 Share Post"):
             post_text = st.session_state.get("generated_text", "")
             # For now, we are not attaching the image, but you could include the image URL if needed.
