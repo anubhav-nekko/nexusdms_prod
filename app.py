@@ -2416,7 +2416,7 @@ def main():
                                     st.markdown(f"**Filename:** {metadata['filename']}, **Page:** {metadata['page']}")
                                     st.code(metadata['text'], language="markdown")  # Use st.code for better formatting
                                 except:
-                                    st.code(metadata['text'], language="markdown")  # Use st.code for better formatting
+                                    st.code(json.dumps(metadata), language="markdown")  # Use st.code for better formatting
 
                             # Show Web Search Results separately
                             if ws_query:
