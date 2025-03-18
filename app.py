@@ -1161,6 +1161,21 @@ def chunk_text(pages_text, chunk_size=1):
 
     return chunks
 
+def delete_file(file_name):
+    try:
+        # Delete from Azure Blob Storage:
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        blob_client = blob_service_client.get_blob_client(container=s3_bucket_name, blob=file_name)
+        blob_client.delete_blob()
+        st.success(f"Deleted file '{file_name}' from Blob Storage.")
+    except Exception as e:
+        st.error(f"Error deleting file: {str(e)}")
+    
+    # Remove the file from metadata_store (filter out all records with that filename)
+    global metadata_store
+    metadata_store = [md for md in metadata_store if md["filename"] != file_name]
+    # Optionally, update your index if needed and re-save metadata:
+    save_index_and_metadata()
 
 def add_pdf_to_index(pdf_file):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
@@ -1185,8 +1200,10 @@ def add_pdf_to_index(pdf_file):
             metadata_store.append({
                 "filename": os.path.basename(pdf_file.name),
                 "page": page_num,
-                "text": page_content
-            })
+                "text": page_content,
+                "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+                "shared_with": [] 
+            })            
             
             # Update progress bar and clear previous message after updating
             progress_bar.progress(page_num / total_pages)  # Update to reflect current page
@@ -1830,7 +1847,9 @@ def process_pdf(pdf_file):
         metadata_store.append({
             "filename": os.path.basename(pdf_file.name),
             "page": page_num,
-            "text": page_content
+            "text": page_content,
+            "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+            "shared_with": [] 
         })
         progress_bar.progress(page_num / total_pages)
     
@@ -1872,7 +1891,9 @@ def process_image(image_file):
     metadata_store.append({
         "filename": os.path.basename(image_file.name),
         "page": 1,  # Only one "page" for an image
-        "text": text
+        "text": text,
+        "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+        "shared_with": [] 
     })
     save_index_and_metadata()
     try:
@@ -1900,7 +1921,9 @@ def process_docx(docx_file):
             metadata_store.append({
                 "filename": os.path.basename(docx_file.name),
                 "page": idx,
-                "text": chunk
+                "text": chunk,
+                "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+                "shared_with": [] 
             })
     except Exception as e:
         st.error(f"Error processing DOCX: {str(e)}")
@@ -1921,7 +1944,9 @@ def process_pptx(pptx_file):
             metadata_store.append({
                 "filename": os.path.basename(pptx_file.name),
                 "page": idx,  # Slide number
-                "text": slide_text
+                "text": slide_text,
+                "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+                "shared_with": [] 
             })
     except Exception as e:
         st.error(f"Error processing PPTX: {str(e)}")
@@ -1954,7 +1979,9 @@ def process_spreadsheet(file_obj):
         metadata_store.append({
             "filename": f"{os.path.basename(file_obj.name)} ({sheet_name})",
             "page": i + 1,  # Store as an integer instead of "chunk_{i+1}"
-            "text": chunk_text
+            "text": chunk_text,
+            "owner": st.session_state.get("username", "unknown"),  # Save the uploader’s username
+            "shared_with": [] 
         })
     save_index_and_metadata()
 
@@ -2081,7 +2108,7 @@ def main():
         logout()  # Display the logout button in the sidebar
 
     st.sidebar.header("Options")
-    option = st.sidebar.selectbox("Choose an option", ["Query Documents", "Query Advanced", "Taskmeister", "Upload Documents", "Usage Monitoring"])
+    option = st.sidebar.selectbox("Choose an option", ["Query Documents", "Query Advanced", "Taskmeister", "Upload Documents", "File Manager", "Usage Monitoring"])
 
     if option == "Upload Documents":
         st.header("Upload Documents")
@@ -2100,6 +2127,39 @@ def main():
                     add_file_to_index(uploaded_file)
                     st.success(f"File '{uploaded_file.name}' has been successfully uploaded and added to the index.")
 
+    elif option == "File Manager":
+        available_usernames = list(USERS.keys())
+        st.header("My Uploaded Files")
+        # Filter files for the current user (see user isolation in step 2)
+        current_user = st.session_state.get("username", "unknown")
+        available_files = [
+            md["filename"] for md in metadata_store 
+            if md.get("owner") == current_user or current_user in md.get("shared_with", [])
+        ]
+        if available_files:
+            for fname in available_files:
+                col1, col2 = st.columns([0.7, 0.3])
+                with col1:
+                    st.write(fname)
+                with col2:
+                    if st.button("Delete", key=f"del_{fname}"):
+                        delete_file(fname)
+        else:
+            st.sidebar.info("No files uploaded yet.")
+
+        # In the File Manager section:
+        st.sidebar.header("Share a File")
+        file_to_share = st.sidebar.selectbox("Select a file to share", available_files)
+        share_with = st.sidebar.multiselect("Select user(s) to share with", options=available_usernames)
+
+        if st.sidebar.button("Share File"):
+            # Update metadata for the file if the current user is the owner
+            for md in metadata_store:
+                if md["filename"] == file_to_share and md.get("owner") == current_user:
+                    md.setdefault("shared_with", []).extend(share_with)
+                    md["shared_with"] = list(set(md["shared_with"]))  # Remove duplicates
+                    st.success(f"Shared {file_to_share} with {', '.join(share_with)}")
+            save_index_and_metadata()
 
     elif option == "Query Documents":
         st.header("Query Documents")
@@ -2122,7 +2182,15 @@ def main():
         top_k = st.sidebar.slider("Select Top-K Results", min_value=1, max_value=100, value=50, step=1)
 
         # File and Page Range Selection
-        available_files = list(set([metadata['filename'] for metadata in metadata_store]))
+        # available_files = list(set([metadata['filename'] for metadata in metadata_store]))
+        current_user = st.session_state.get("username", "unknown")
+        # Only include files where the owner is the current user or shared with the user.
+        available_files = [
+            md["filename"] for md in metadata_store 
+            if md.get("owner") == current_user or current_user in md.get("shared_with", [])
+        ]
+
+
         if available_files:
             # Use multiselect and store the selection in session state.
             st.session_state.selected_files = st.multiselect(
@@ -2517,7 +2585,15 @@ def main():
         top_k = st.sidebar.slider("Select Top-K Results", min_value=1, max_value=100, value=50, step=1)
 
         # File and Page Range Selection
-        available_files = list(set([metadata['filename'] for metadata in metadata_store]))
+        # available_files = list(set([metadata['filename'] for metadata in metadata_store]))
+        current_user = st.session_state.get("username", "unknown")
+        # Only include files where the owner is the current user or shared with the user.
+        available_files = [
+            md["filename"] for md in metadata_store 
+            if md.get("owner") == current_user or current_user in md.get("shared_with", [])
+        ]
+
+
         if available_files:
             # Use multiselect and store the selection in session state.
             st.session_state.selected_files = st.multiselect(
