@@ -2138,13 +2138,14 @@ def main():
             if md.get("owner") == current_user or current_user in md.get("shared_with", [])
         ]
         if available_files:
-            for fname in available_files:
-                col1, col2 = st.columns([0.7, 0.3])
-                with col1:
-                    st.write(fname)
-                with col2:
-                    if st.button("Delete", key=f"del_{fname}"):
-                        delete_file(fname)
+            if available_files:
+                for i, fname in enumerate(available_files):
+                    col1, col2 = st.columns([0.7, 0.3])
+                    with col1:
+                        st.write(fname)
+                    with col2:
+                        if st.button("Delete", key=f"del_{fname}_{i}"):
+                            delete_file(fname)
         else:
             st.sidebar.info("No files uploaded yet.")
 
@@ -2287,7 +2288,7 @@ def main():
         if st.sidebar.toggle("Rename Conversation"):
             for idx, conv in enumerate(unique_conversations):
                 # Use the custom label if available; otherwise, use a preview of the first message.
-                default_label = conv.get("label") or conv.get('messages', [{}])[0].get("content", "")[:20]
+                default_label = conv.get("label") or conv.get('messages', [{}])[0].get("content", "")[:50]
                 
                 # Create two columns: one for selecting the conversation, one for renaming it.
                 col1, col2 = st.sidebar.columns([2, 1])
