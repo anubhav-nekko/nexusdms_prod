@@ -1040,7 +1040,7 @@ def call_nekkollm_api(system_message, user_query):
     payload = {  
         "messages": messages,  
         "temperature": 0.7,  
-        "max_tokens": 16384   
+        "max_tokens": 4096   
     }
     response = requests.post(url, headers=headers, data=json.dumps(payload))
     response.raise_for_status()  
@@ -1338,7 +1338,8 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
     ```
     '''
 
-    prompts = call_llm_api(qp_prompt["system_message"], qp_prompt["user_query"]+op_format)
+    prompts = call_gpt_api(qp_prompt["system_message"], qp_prompt["user_query"]+op_format)
+    print(prompts)
     try:
         # return json.loads(answer[7:-3])
         prompt_op = json.loads(prompts.split("```json")[1].split("```")[0])
@@ -1410,7 +1411,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
             "Based on the above, generate a bullet list of key topics for drafting a legal document. "
             "Each topic should appear on its own line, starting with a dash (-)."
         )
-        topics_response = call_llm_api(sys_msg, bullet_prompt)
+        topics_response = call_gpt_api(sys_msg, bullet_prompt)
         topics = [line.lstrip(" -").strip() for line in topics_response.split("\n") if line.strip()]
         total_topics = len(topics)
 
@@ -1425,7 +1426,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
                 f"{final_draft}\n"
                 "3. Make sure not to repeat information already included in previous sections.\n"
             )
-            detailed_response = call_llm_api(sys_msg, elaboration_prompt)
+            detailed_response = call_gpt_api(sys_msg, elaboration_prompt)
             final_draft += f"\n\n# {topic}:\n{detailed_response}"
             st.info(f"Drafting for topic {index}/{total_topics} ({topic}) completed.")
 
@@ -1549,7 +1550,7 @@ def final_format(top_k_metadata, answer, ws_response):
         ```
     '''
     # Call the LLM API to get the answer
-    answer = call_llm_api(sys_msg, input_context+final_op_format)
+    answer = call_gpt_api(sys_msg, input_context+final_op_format)
     try:
         # return json.loads(answer[7:-3])
         return json.loads(answer.split("```json")[1].split("```")[0])
@@ -1573,7 +1574,7 @@ def summarize_document_pages(filename, start_page, end_page, summary_prompt):
     # If the selected pages are less than 20, summarize in one go.
     if total_pages < 50:
         user_query = f"Summarize the following document text from Document {filename} \n{full_text}"
-        summary = call_llm_api(summary_prompt, user_query)
+        summary = call_gpt_api(summary_prompt, user_query)
         return summary
 
     # Else, create overlapping chunks.
@@ -1591,7 +1592,7 @@ def summarize_document_pages(filename, start_page, end_page, summary_prompt):
         # chunk_text = json.dumps(pages[j] for j in range(start_idx, end_idx))
         chunk_text = json.dumps([pages[j] for j in range(start_idx, end_idx)])
         user_query = f"Summarize the following document from file `{filename}` text:\n{chunk_text}"
-        chunk_summary = call_llm_api(summary_prompt, user_query)
+        chunk_summary = call_gpt_api(summary_prompt, user_query)
         chunk_summaries.append(chunk_summary)
         # Advance by base_chunk_size minus the overlap.
         i += (base_chunk_size - overlap)
@@ -1599,7 +1600,7 @@ def summarize_document_pages(filename, start_page, end_page, summary_prompt):
     # Consolidate the chunk summaries into a final summary.
     consolidation_prompt = summary_prompt + "\n\nPlease consolidate the following summaries into one overall summary:"
     consolidation_input = json.dumps(chunk_summaries)
-    final_summary = call_llm_api(consolidation_prompt, consolidation_input)
+    final_summary = call_gpt_api(consolidation_prompt, consolidation_input)
     return final_summary
 
 def get_web_recommendations(document_summaries, insights):
@@ -1626,7 +1627,7 @@ def get_web_recommendations(document_summaries, insights):
     ```
     '''
 
-    prompts = call_llm_api(qp_prompt["system_message"], qp_prompt["user_query"]+op_format)
+    prompts = call_gpt_api(qp_prompt["system_message"], qp_prompt["user_query"]+op_format)
     print(prompts)
     try:
         # return json.loads(answer[7:-3])
@@ -1653,9 +1654,9 @@ def get_web_recommendations(document_summaries, insights):
 
     print(ws_response)
 
-    web_response = call_llm_api(ws_prompt_lib, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
-    nexus_insights = call_llm_api(insights_prompt_lib, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
-    faq = call_llm_api(qna_prompt, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
+    web_response = call_gpt_api(ws_prompt_lib, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
+    nexus_insights = call_gpt_api(insights_prompt_lib, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
+    faq = call_gpt_api(qna_prompt, f"The Document Summaries: {json.dumps(document_summaries)} \n\n The Key Observations: {insights} \n\n The Web Search Results: {json.dumps(ws_response)}")
     
     return web_response, nexus_insights, faq
 
@@ -1665,7 +1666,7 @@ def generate_post_text(task_type, template_instructions, description):
     user_instructions = "Use your own Creative Liberties. Follow the instructions above and DO not Insert Text on the Images. Include Emojis and Stickers if Appropriate"
 
     # Dummy response for now:
-    return call_llm_api(prompt, user_instructions)
+    return call_gpt_api(prompt, user_instructions)
 
 # Function to generate an image from text (placeholder; replace with your text-to-image function)
 def generate_post_image(post_text):
@@ -2251,7 +2252,7 @@ def main():
             st.subheader("Observations and Insights")
             # with cols1:
             st.markdown("**Key Observations**")
-            insights = call_llm_api(insights_prompt, json.dumps(summaries))
+            insights = call_gpt_api(insights_prompt, json.dumps(summaries))
             with st.expander("Click to view"):
                 st.write(insights)
             # with cols2:
@@ -2332,7 +2333,7 @@ def main():
 
             for idx, conv in enumerate(unique_conversations):
                 # The first line of the conversation becomes the label if no 'label' set
-                conv_label = conv.get("label") or conv.get('messages', [{}])[0].get("content", "")[:20]
+                conv_label = conv.get("label") or conv.get('messages', [{}])[0].get("content", "")[:50]
                 
                 # Use two columns in the sidebar
                 col1, col2 = st.sidebar.columns([0.9, 0.1], gap="small")
