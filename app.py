@@ -2133,10 +2133,11 @@ def main():
         st.header("My Uploaded Files")
         # Filter files for the current user (see user isolation in step 2)
         current_user = st.session_state.get("username", "unknown")
-        available_files = [
-            md["filename"] for md in metadata_store 
+        available_files = list({
+            md["filename"] 
+            for md in metadata_store 
             if md.get("owner") == current_user or current_user in md.get("shared_with", [])
-        ]
+        })
         if available_files:
             if available_files:
                 for i, fname in enumerate(available_files):
@@ -2187,10 +2188,11 @@ def main():
         # available_files = list(set([metadata['filename'] for metadata in metadata_store]))
         current_user = st.session_state.get("username", "unknown")
         # Only include files where the owner is the current user or shared with the user.
-        available_files = [
-            md["filename"] for md in metadata_store 
+        available_files = list({
+            md["filename"] 
+            for md in metadata_store 
             if md.get("owner") == current_user or current_user in md.get("shared_with", [])
-        ]
+        })
 
 
         if available_files:
@@ -2590,10 +2592,11 @@ def main():
         # available_files = list(set([metadata['filename'] for metadata in metadata_store]))
         current_user = st.session_state.get("username", "unknown")
         # Only include files where the owner is the current user or shared with the user.
-        available_files = [
-            md["filename"] for md in metadata_store 
+        available_files = list({
+            md["filename"] 
+            for md in metadata_store 
             if md.get("owner") == current_user or current_user in md.get("shared_with", [])
-        ]
+        })
 
 
         if available_files:
