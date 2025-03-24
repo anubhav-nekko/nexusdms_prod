@@ -498,9 +498,9 @@ prompt_library = {
 }
 
 system_message = """
-    You are a Helpful Legal Data Analyst specializing in legal document analysis. Your task is to do the following:
-    
-    - Your Primary Focus should Always be on how to protect and save the prime accused.
+    You are an advanced legal data analyst specializing in legal document analysis. Provide an in-depth analysis of the provided document text, highlighting anomalies, procedural errors, and legal nuances. Include any supporting legal citations and mention if further clarification is needed.
+    Your task is to do the following:
+
     - Focus on delivering answers that are directly related to the Question, ensuring that the response is as specific and actionable as possible based on the context you retrieve.
     - If the answer is not present in the context or if the query is ambiguous or vague, state that the information cannot be determined or is not available from the document.
     - Always provide any additional insights from the fetched contexts that may be relevant to the question, such as anomalies, contradictions, or key points that could aid in an investigation or analysis.
@@ -1394,6 +1394,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
             "1. Review the User Query, Document Context, and Conversation History.\n"
             "2. Generate a bullet list of key topics for the document.\n"
             "3. For each topic, draft a detailed section ensuring continuity and avoiding repetition.\n\n"
+            "4. Always present your outputs in Proper Markdown Formatting"
             "-----\n"
             "User Query:\n"
             f"{prompt}\n"
@@ -1408,8 +1409,9 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
 
         # Step 1: Generate bullet list of topics.
         bullet_prompt = (
-            "Based on the above, generate a bullet list of key topics for drafting a legal document. "
+            "Based on the above, generate a detailed bullet list of topics for drafting a document. (Like a Table of Contents)"
             "Each topic should appear on its own line, starting with a dash (-)."
+            "Adhere to the conversation and context to understand what formatting and style you should follow and what content you should present."
         )
         topics_response = call_gpt_api(sys_msg, bullet_prompt)
         topics = [line.lstrip(" -").strip() for line in topics_response.split("\n") if line.strip()]
@@ -1425,6 +1427,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
                 "2. The draft generated so far:\n"
                 f"{final_draft}\n"
                 "3. Make sure not to repeat information already included in previous sections.\n"
+                "4. Adhere to the conversation and context to understand what formatting and style you should follow and what content you should present."
             )
             detailed_response = call_gpt_api(sys_msg, elaboration_prompt)
             final_draft += f"\n\n# {topic}:\n{detailed_response}"
@@ -1434,7 +1437,6 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
 
 
     user_query = f"""
-    You are required to provide a structured response to the following question, based on the context retrieved from the provided documents.
 
     # User Query:
     <<<{prompt}>>>
@@ -1444,11 +1446,6 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
 
     # The last few messages of the conversation to help you maintain continuity and relevance:
     {json.dumps(last_messages)}
-
-    # Always Approach the Task Step by Step.
-    * Read and Understand the Provided Contexts.
-    * Identify Relevant sections from those and Arrange them as necessary
-    * Then Formulate your Answer Adhering to the Guidelines.
     """
 
     ws_response = ""
