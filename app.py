@@ -1386,6 +1386,44 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
                     # with cols[idx]:
         top_k_metadata = summaries
 
+    user_query = f"""
+
+    # User Query:
+    <<<{prompt}>>>
+
+    # The top K most relevant contexts fetched from the documents are as follows:
+    {json.dumps(top_k_metadata, indent=4)}
+
+    # The last few messages of the conversation to help you maintain continuity and relevance:
+    {json.dumps(last_messages)}
+    """
+
+    ws_response = ""
+    wsp = ""
+
+    if web_search or analyse_mode or draft_mode:
+        ws_query = prompt_op["web_search_prompt"]
+        # Call the LLM API to get the answer
+        # To install, run: pip install tavily-python
+
+
+        client = TavilyClient(api_key=TAVILY_API)
+
+        ws_response = client.search(
+            query=ws_query,
+            search_depth="advanced",
+            include_raw_content=True
+        )
+
+        print(ws_response)
+
+        wsp = f"""
+        # Feel free to use the Web Search Results for Additional Context as well:
+        Please ensure your output is concise, well-organized, and each resource hyperlink is clickable. Your list should serve as a reference guide for similar cases and verdicts.
+
+        {json.dumps(ws_response)}
+        """
+    
     if draft_mode:
         # Construct a structured system message with clear sections.
         sys_msg = (
@@ -1413,7 +1451,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
             "Each topic should appear on its own line, starting with a dash (-)."
             "Adhere to the conversation and context to understand what formatting and style you should follow and what content you should present."
         )
-        topics_response = call_gpt_api(sys_msg, bullet_prompt)
+        topics_response = call_gpt_api(sys_msg, bullet_prompt+wsp)
         topics = [line.lstrip(" -").strip() for line in topics_response.split("\n") if line.strip()]
         total_topics = len(topics)
 
@@ -1429,62 +1467,18 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
                 "3. Make sure not to repeat information already included in previous sections.\n"
                 "4. Adhere to the conversation and context to understand what formatting and style you should follow and what content you should present."
             )
-            detailed_response = call_gpt_api(sys_msg, elaboration_prompt)
+            detailed_response = call_gpt_api(sys_msg, elaboration_prompt+wsp)
             final_draft += f"\n\n# {topic}:\n{detailed_response}"
             st.info(f"Drafting for topic {index}/{total_topics} ({topic}) completed.")
 
         return [], final_draft, ""
-
-
-    user_query = f"""
-
-    # User Query:
-    <<<{prompt}>>>
-
-    # The top K most relevant contexts fetched from the documents are as follows:
-    {json.dumps(top_k_metadata, indent=4)}
-
-    # The last few messages of the conversation to help you maintain continuity and relevance:
-    {json.dumps(last_messages)}
-    """
-
-    ws_response = ""
-
-    if web_search or analyse_mode:
-        ws_query = prompt_op["web_search_prompt"]
-        # Call the LLM API to get the answer
-        # To install, run: pip install tavily-python
-
-
-        client = TavilyClient(api_key=TAVILY_API)
-
-        ws_response = client.search(
-            query=ws_query,
-            search_depth="advanced",
-            include_raw_content=True
-        )
-
-        print(ws_response)
-
-        wsp = f"""
-        # Feel free to use the Web Search Results for Additional Context as well:
-        Please ensure your output is concise, well-organized, and each resource hyperlink is clickable. Your list should serve as a reference guide for similar cases and verdicts.
-
-        {json.dumps(ws_response)}
-        """
-        if llm_model=="Claude 3.5 Sonnet":
-            answer = call_llm_api(system_message, user_query+wsp)
-        elif llm_model=="Model 3":
-            answer = call_gpt_api(system_message, user_query+wsp)
-        elif llm_model=="Nekko 2":
-            answer = call_nekkollm_api(system_message, user_query+wsp)
-    else:
-        if llm_model=="Claude 3.5 Sonnet":
-            answer = call_llm_api(system_message, user_query)
-        elif llm_model=="Model 3":
-            answer = call_gpt_api(system_message, user_query)
-        elif llm_model=="Nekko 2":
-            answer = call_nekkollm_api(system_message, user_query)
+    
+    if llm_model=="Claude 3.5 Sonnet":
+        answer = call_llm_api(system_message, user_query+wsp)
+    elif llm_model=="Model 3":
+        answer = call_gpt_api(system_message, user_query+wsp)
+    elif llm_model=="Nekko 2":
+        answer = call_nekkollm_api(system_message, user_query+wsp)
 
     return top_k_metadata, answer, ws_response
 
