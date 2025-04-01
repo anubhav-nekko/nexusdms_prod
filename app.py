@@ -784,7 +784,7 @@ def load_dict_from_json(file_path):
 
 # Load the MPNet model
 mpnet_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
-secrets_file = "../secrets.json"
+secrets_file = "C:\\Users\\Anubhab Roy\\Downloads\\Nekko_WorkFiles\\GST_dost\\RAG_Bot_GST_Dost\\nexusdms_prod\\secrets.json"
 
 SECRETS = load_dict_from_json(secrets_file)
 
@@ -813,7 +813,7 @@ connection_string = SECRETS["connection_string"]
 s3_bucket_name = SECRETS["container_name"]
 
 # Users File Path 
-users_file = "../users.json"
+users_file = "C:\\Users\\Anubhab Roy\\Downloads\\Nekko_WorkFiles\\GST_dost\\RAG_Bot_GST_Dost\\nexusdms_prod\\users.json"
 
 # Define a helper function to display your company logo
 def display_logo():
@@ -1369,7 +1369,7 @@ def query_documents_with_page_range(selected_files, selected_page_ranges, prompt
     query_embedding = generate_titan_embeddings(query).reshape(1, -1)
     if faiss_index.ntotal == 0:
         st.error("The FAISS index is empty. Please upload a PDF to populate the index.")
-        return [], "No data available to query."
+        return [], "No data available to query.", ""
 
     # Fetch all metadata for the given query
     k = faiss_index.ntotal  # Initial broad search
@@ -2124,7 +2124,7 @@ def main():
         logout()  # Display the logout button in the sidebar
 
     st.sidebar.header("Options")
-    option = st.sidebar.selectbox("Choose an option", ["Query Documents", "Query Advanced", "Taskmeister", "Upload Documents", "File Manager", "Usage Monitoring"])
+    option = st.sidebar.selectbox("Choose an option", ["Upload Documents", "Query Documents", "Query Advanced", "Taskmeister", "File Manager", "Usage Monitoring"])
 
     if option == "Upload Documents":
         st.header("Upload Documents")
@@ -2319,17 +2319,16 @@ def main():
             if st.session_state.get("rename_mode") == conv_id:
                 new_label = st.sidebar.text_input("Rename Conversation", value=default_label, key=f"rename_input_{conv_id}")
                 if st.sidebar.button("Save", key=f"save_rename_{conv_id}"):
-                    conv["label"] = new_label
-                    # Update the conversation in the chat history for the current user.
                     user = st.session_state.username
                     if user in st.session_state.chat_history:
-                        for stored_conv in st.session_state.chat_history[user]:
+                        for idx, stored_conv in enumerate(st.session_state.chat_history[user]):
                             if stored_conv.get("timestamp") == conv_id:
-                                stored_conv["label"] = new_label
-                                break
+                                # Only update the label
+                                st.session_state.chat_history[user][idx]["label"] = new_label
+                                break 
                     save_chat_history(st.session_state.chat_history)
-                    st.session_state["rename_mode"] = None  # Exit rename mode.
-                    st.sidebar.success("Conversation renamed!")
+                    st.session_state["rename_mode"] = None
+                    st.sidebar.success("✅ Conversation renamed successfully!")
                     st.rerun()
             else:
                 col1, col2, col3, col4 = st.sidebar.columns([0.5, 0.2, 0.2, 0.1])
@@ -2373,8 +2372,12 @@ def main():
 
         # If a conversation is marked for deletion, confirm deletion.
         if "confirm_delete_conv" in st.session_state:
-            st.sidebar.warning("Are you sure you want to delete this conversation? This action cannot be undone.")
-            ccol1, ccol2 = st.sidebar.columns(2)
+            chat_name = (
+                st.session_state["confirm_delete_conv"].get("label")
+                or st.session_state["confirm_delete_conv"].get('messages', [{}])[0].get("content", "")[:50]
+            )
+            st.warning(f"Are you sure you want to delete '{chat_name}' conversation?")
+            ccol1, ccol2 = st.columns(2)
             with ccol1:
                 if st.button("Confirm Delete"):
                     user = st.session_state.username
@@ -2512,6 +2515,15 @@ def main():
             last_messages = st.session_state.messages[-5:] if len(st.session_state.messages) >= 5 else st.session_state.messages
 
             with st.spinner("Searching documents..."):
+                st.markdown("**While you wait, Feel free to Play a Relaxing Game**")
+                # for files in st.session_state.selected_file:
+                #     st.markdown(f"**{files}**: ")
+                st.markdown("[Play Space Galaga](http://127.0.0.1:8000/)")
+                st.markdown("[Play Snake Game](http://127.0.0.1:8001/)")
+                st.markdown("[Play Atari Breakout](http://127.0.0.1:8002/)")
+                st.markdown("[Play Endless Runner](http://127.0.0.1:8003/)")
+
+
                 top_k_metadata, answer, ws_response = query_documents_with_page_range(
                     st.session_state.selected_files, 
                     st.session_state.selected_page_ranges, 
@@ -2523,6 +2535,51 @@ def main():
                     draft_mode, 
                     analyse_mode
                 )
+
+                if "error" in answer.lower():
+                    if "bedrock" in answer.lower() or "tavily" in answer.lower():
+                            summary_prompt_dict = {
+                                "system_message": "You are an intelligent query refiner. Your job is to take a user's original query (which may contain poor grammar or informal language) along with the last 5 messages of the conversation and Summarise it into a Detailed Concise Message which explains what the user is asking for. Ensure you do not miss any details",
+                                "user_query": f"User Query: {user_message}\n\nLast 5 Messages: {last_messages}"
+                            }
+
+                            prompt = call_gpt_api(summary_prompt_dict["system_message"], summary_prompt_dict["user_query"])
+
+                            if "error" in prompt and "bedrock" in prompt:
+                                last_messages = st.session_state.messages[-2:] if len(st.session_state.messages) >= 2 else st.session_state.messages
+                                summary_prompt_dict = {
+                                    "system_message": "You are an intelligent query refiner. Your job is to take a user's original query (which may contain poor grammar or informal language) along with the last 5 messages of the conversation and Summarise it into a Detailed Concise Message which explains what the user is asking for. Ensure you do not miss any details",
+                                    "user_query": f"User Query: {user_message}\n\nLast 5 Messages: {last_messages}"
+                                }
+
+                                prompt = call_gpt_api(summary_prompt_dict["system_message"], summary_prompt_dict["user_query"])
+
+                            top_k_metadata, answer, ws_response = query_documents_with_page_range(
+                                st.session_state.selected_files, 
+                                st.session_state.selected_page_ranges, 
+                                prompt,
+                                top_k,
+                                [],
+                                web_search,
+                                llm_model,
+                                draft_mode, 
+                                analyse_mode
+                            )
+
+                            if "error" in answer and "bedrock" in answer:
+                                top_k_metadata, answer, ws_response = query_documents_with_page_range(
+                                    st.session_state.selected_files, 
+                                    st.session_state.selected_page_ranges, 
+                                    prompt,
+                                    top_k,
+                                    [],
+                                    web_search,
+                                    llm_model,
+                                    draft_mode, 
+                                    True
+                                )
+
+
                 st.session_state.sources.append({
                     "top_k_metadata": top_k_metadata,
                     "answer": answer,
