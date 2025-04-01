@@ -734,7 +734,7 @@ import plotly.graph_objects as go # type: ignore
 from docx import Document # type: ignore
 from pptx import Presentation # type: ignore
 import pandas as pd # type: ignore
-from azure.storage.blob import BlobServiceClient # type: ignore
+from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions # type: ignore
 import io
 from io import BytesIO
 from PIL import Image # type: ignore
@@ -810,6 +810,8 @@ s3_bucket_name = SECRETS["s3_bucket_name"]
 
 # Azure Blob Storage setup
 connection_string = SECRETS["connection_string"]
+azure_account_name = SECRETS["azure_account_name"]
+azure_account_key = SECRETS["azure_account_key"]
 s3_bucket_name = SECRETS["container_name"]
 
 # Users File Path 
@@ -834,6 +836,26 @@ textract_client = boto3.client('textract', region_name=REGION,
 s3_client = boto3.client('s3', region_name=REGION,
                          aws_access_key_id=aws_access_key_id,
                          aws_secret_access_key=aws_secret_access_key)
+
+def get_blob_sas_url(blob_name, expiry_hours=1):
+    
+    """
+    Generate a SAS URL for a blob that is valid for 'expiry_hours' hours.
+    """
+    
+    # Create the BlobServiceClient
+    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+    
+    sas_token = generate_blob_sas(
+        account_name=azure_account_name,
+        container_name=s3_bucket_name,
+        blob_name=blob_name,
+        account_key=azure_account_key,
+        permission=BlobSasPermissions(read=True),
+        expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=expiry_hours)
+    )
+    blob_url = f"https://{azure_account_name}.blob.core.windows.net/{s3_bucket_name}/{blob_name}"
+    return f"{blob_url}?{sas_token}"
 
 def save_chat_history(chat_history, blob_name="chat_history.json"):
     # try:
@@ -2515,9 +2537,13 @@ def main():
             last_messages = st.session_state.messages[-5:] if len(st.session_state.messages) >= 5 else st.session_state.messages
 
             with st.spinner("Searching documents..."):
-                st.markdown("**While you wait, Feel free to Play a Relaxing Game**")
-                # for files in st.session_state.selected_file:
-                #     st.markdown(f"**{files}**: ")
+                st.markdown("**While you wait, Feel free to Refer to the Original Documents or Play a Relaxing Game**")
+
+                for blob_name in st.session_state.selected_file:
+                    sas_url = get_blob_sas_url(blob_name)
+                    # Display the link as a clickable markdown link
+                    st.markdown(f"[**{blob_name}**]({sas_url})", unsafe_allow_html=True)
+
                 st.markdown("[Play Space Galaga](http://127.0.0.1:8000/)")
                 st.markdown("[Play Snake Game](http://127.0.0.1:8001/)")
                 st.markdown("[Play Atari Breakout](http://127.0.0.1:8002/)")
