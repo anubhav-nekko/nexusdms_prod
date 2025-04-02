@@ -784,7 +784,7 @@ def load_dict_from_json(file_path):
 
 # Load the MPNet model
 mpnet_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
-secrets_file = "C:\\Users\\Anubhab Roy\\Downloads\\Nekko_WorkFiles\\GST_dost\\RAG_Bot_GST_Dost\\nexusdms_prod\\secrets.json"
+secrets_file = "..\secrets.json"
 
 SECRETS = load_dict_from_json(secrets_file)
 
@@ -815,7 +815,7 @@ azure_account_key = SECRETS["azure_account_key"]
 s3_bucket_name = SECRETS["container_name"]
 
 # Users File Path 
-users_file = "C:\\Users\\Anubhab Roy\\Downloads\\Nekko_WorkFiles\\GST_dost\\RAG_Bot_GST_Dost\\nexusdms_prod\\users.json"
+users_file = "..\users.json"
 
 # Define a helper function to display your company logo
 def display_logo():
@@ -838,22 +838,21 @@ s3_client = boto3.client('s3', region_name=REGION,
                          aws_secret_access_key=aws_secret_access_key)
 
 def get_blob_sas_url(blob_name, expiry_hours=1):
-    
     """
     Generate a SAS URL for a blob that is valid for 'expiry_hours' hours.
     """
-    
     # Create the BlobServiceClient
     blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    
+
     sas_token = generate_blob_sas(
         account_name=azure_account_name,
         container_name=s3_bucket_name,
         blob_name=blob_name,
         account_key=azure_account_key,
         permission=BlobSasPermissions(read=True),
-        expiry=datetime.datetime.utcnow() + datetime.timedelta(hours=expiry_hours)
+        expiry=datetime.utcnow() + timedelta(hours=expiry_hours)  # Fixed usage here
     )
+    
     blob_url = f"https://{azure_account_name}.blob.core.windows.net/{s3_bucket_name}/{blob_name}"
     return f"{blob_url}?{sas_token}"
 
@@ -2539,15 +2538,15 @@ def main():
             with st.spinner("Searching documents..."):
                 st.markdown("**While you wait, Feel free to Refer to the Original Documents or Play a Relaxing Game**")
 
-                for blob_name in st.session_state.selected_file:
+                for blob_name in st.session_state.selected_files:
                     sas_url = get_blob_sas_url(blob_name)
                     # Display the link as a clickable markdown link
                     st.markdown(f"[**{blob_name}**]({sas_url})", unsafe_allow_html=True)
 
-                st.markdown("[Play Space Galaga](http://127.0.0.1:8000/)")
-                st.markdown("[Play Snake Game](http://127.0.0.1:8001/)")
-                st.markdown("[Play Atari Breakout](http://127.0.0.1:8002/)")
-                st.markdown("[Play Endless Runner](http://127.0.0.1:8003/)")
+                st.markdown("[Play Space Galaga](http://127.0.0.1:5500/space.html)")
+                st.markdown("[Play Snake Game](http://127.0.0.1:5500/snake.html)")
+                st.markdown("[Play Atari Breakout](http://127.0.0.1:5500/atari.html)")
+                st.markdown("[Play Endless Runner](http://127.0.0.1:5500/surfer.html)")
 
 
                 top_k_metadata, answer, ws_response = query_documents_with_page_range(
