@@ -1,3 +1,5 @@
+# For Issues with pymupdf: sudo apt-get install libgl1
+
 # nexusdms_prod
 
 Project Overview
